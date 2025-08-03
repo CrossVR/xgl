@@ -1752,6 +1752,22 @@ void GraphicsPipeline::BindToCmdBuffer(
             } while (deviceGroup.IterateNext());
         }
 
+        if (ContainsStaticState(DynamicStatesInternal::DepthClampControl))
+        {
+            utils::IterateMask deviceGroup(pCmdBuffer->GetDeviceMask());
+            do
+            {
+                Pal::DepthClamp* pDepthClamp = &(pCmdBuffer->PerGpuState(deviceGroup.Index())->viewport.depthClampOverride);
+
+                if (pDepthClamp->minDepth != m_info.viewportParams.depthClampOverride.minDepth ||
+                    pDepthClamp->maxDepth != m_info.viewportParams.depthClampOverride.maxDepth)
+                {
+                    *pDepthClamp = m_info.viewportParams.depthClampOverride;
+                    pRenderState->dirtyGraphics.viewport = 1;
+                }
+            } while (deviceGroup.IterateNext());
+        }
+
         Pal::DepthRange depthRange = pGfxDynamicBindInfo->depthRange;
         if (ContainsStaticState(DynamicStatesInternal::DepthClipNegativeOneToOne))
         {
@@ -1769,11 +1785,6 @@ void GraphicsPipeline::BindToCmdBuffer(
 
             pRenderState->dirtyGraphics.viewport = 1;
         }
-    }
-
-    if (ContainsStaticState(DynamicStatesInternal::DepthClampControl))
-    {
-        pRenderState->depthClampOverride = m_info.depthClampOverride;
     }
 
     if (ContainsStaticState(DynamicStatesInternal::Scissor))

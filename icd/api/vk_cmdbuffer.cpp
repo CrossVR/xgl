@@ -1747,9 +1747,6 @@ void CmdBuffer::ResetPipelineState()
 
     memset(&m_allGpuState.samplePattern, 0u, sizeof(m_allGpuState.samplePattern));
 
-    m_allGpuState.depthClampOverride.minDepthClamp = 1.0f;
-    m_allGpuState.depthClampOverride.maxDepthClamp = 0.0f;
-
     uint32_t bindIdx = 0;
 
     do
@@ -1799,20 +1796,21 @@ void CmdBuffer::ResetPipelineState()
     {
         PerGpuRenderState* pPerGpuState = PerGpuState(deviceIdx);
 
-        pPerGpuState->pMsaaState                = nullptr;
-        pPerGpuState->pColorBlendState          = nullptr;
-        pPerGpuState->pDepthStencilState        = nullptr;
-        pPerGpuState->scissor.count             = 1;
-        pPerGpuState->scissor.scissors[0]       = {};
-        pPerGpuState->viewport.count            = 1;
-        pPerGpuState->viewport.viewports[0]     = {};
-        pPerGpuState->viewport.horzClipRatio    = FLT_MAX;
-        pPerGpuState->viewport.vertClipRatio    = FLT_MAX;
-        pPerGpuState->viewport.horzDiscardRatio = 1.0f;
-        pPerGpuState->viewport.vertDiscardRatio = 1.0f;
-        pPerGpuState->viewport.depthRange       = Pal::DepthRange::ZeroToOne;
-        pPerGpuState->maxPipelineStackSizes     = {};
-        pPerGpuState->dynamicPipelineStackSize  = 0;
+        pPerGpuState->pMsaaState                  = nullptr;
+        pPerGpuState->pColorBlendState            = nullptr;
+        pPerGpuState->pDepthStencilState          = nullptr;
+        pPerGpuState->scissor.count               = 1;
+        pPerGpuState->scissor.scissors[0]         = {};
+        pPerGpuState->viewport.count              = 1;
+        pPerGpuState->viewport.viewports[0]       = {};
+        pPerGpuState->viewport.horzClipRatio      = FLT_MAX;
+        pPerGpuState->viewport.vertClipRatio      = FLT_MAX;
+        pPerGpuState->viewport.horzDiscardRatio   = 1.0f;
+        pPerGpuState->viewport.vertDiscardRatio   = 1.0f;
+        pPerGpuState->viewport.depthRange         = Pal::DepthRange::ZeroToOne;
+        pPerGpuState->viewport.depthClampOverride = { 1.0f, 0.0f };
+        pPerGpuState->maxPipelineStackSizes       = {};
+        pPerGpuState->dynamicPipelineStackSize    = 0;
 
         deviceIdx++;
     }
@@ -10198,19 +10196,31 @@ void CmdBuffer::CmdSetDepthClampRangeEXT(
     VkDepthClampModeEXT                         depthClampMode,
     const VkDepthClampRangeEXT*                 pDepthClampRange)
 {
-    switch (depthClampMode)
+    VK_ASSERT(m_cbBeginDeviceMask == m_pDevice->GetPalDeviceMask());
+    utils::IterateMask deviceGroup(m_cbBeginDeviceMask);
+    do
     {
-    case VK_DEPTH_CLAMP_MODE_VIEWPORT_RANGE_EXT:
-        m_allGpuState.depthClampOverride.minDepthClamp = 1.0f;
-        m_allGpuState.depthClampOverride.maxDepthClamp = 0.0f;
-        break;
-    case VK_DEPTH_CLAMP_MODE_USER_DEFINED_RANGE_EXT:
-        m_allGpuState.depthClampOverride = *pDepthClampRange;
-        break;
-    default:
-        VK_ASSERT(!"Unexpected depthClampMode");
-        break;
+        const uint32_t deviceIdx = deviceGroup.Index();
+
+        switch (depthClampMode)
+        {
+        case VK_DEPTH_CLAMP_MODE_VIEWPORT_RANGE_EXT:
+            PerGpuState(deviceIdx)->viewport.depthClampOverride.minDepth = 1.0f;
+            PerGpuState(deviceIdx)->viewport.depthClampOverride.maxDepth = 0.0f;
+            break;
+        case VK_DEPTH_CLAMP_MODE_USER_DEFINED_RANGE_EXT:
+            PerGpuState(deviceIdx)->viewport.depthClampOverride.minDepth = pDepthClampRange->minDepthClamp;
+            PerGpuState(deviceIdx)->viewport.depthClampOverride.maxDepth = pDepthClampRange->maxDepthClamp;
+            break;
+        default:
+            VK_ASSERT(!"Unexpected depthClampMode");
+            break;
+        }
     }
+    while (deviceGroup.IterateNext());
+
+    m_allGpuState.dirtyGraphics.viewport         = 1;
+    m_allGpuState.staticTokens.viewports = DynamicRenderStateToken;
 }
 
 // =====================================================================================================================
@@ -12577,15 +12587,6 @@ void CmdBuffer::ValidateGraphicsStates()
                     // Values more than 1.0f enable guardband.
                     viewportParams.horzDiscardRatio = 10.0f;
                     viewportParams.vertDiscardRatio = 10.0f;
-                }
-                if (m_allGpuState.depthClampOverride.minDepthClamp <= m_allGpuState.depthClampOverride.maxDepthClamp)
-                {
-                    for (uint32_t i = 0; i < viewportParams.count; ++i)
-                    {
-                        auto* const pViewport = &viewportParams.viewports[i];
-                        pViewport->minDepth = m_allGpuState.depthClampOverride.minDepthClamp;
-                        pViewport->maxDepth = m_allGpuState.depthClampOverride.maxDepthClamp;
-                    }
                 }
                 PalCmdBuffer(deviceIdx)->CmdSetViewports(viewportParams);
 

@@ -325,9 +325,6 @@ struct AllGpuRenderState
         uint32_t fragmentShadingRate;
     } staticTokens;
 
-    // min > max means that the override is not active
-    VkDepthClampRangeEXT depthClampOverride;
-
     // Which Vulkan PipelineBindPoint currently owns the state of each PAL pipeline bind point.  This is
     // relevant because e.g. multiple Vulkan pipeline bind points are implemented as compute pipelines and used through
     // the same PAL pipeline bind point.

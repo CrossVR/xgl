@@ -66,8 +66,6 @@ struct GraphicsPipelineObjectImmedInfo
     Pal::PointLineRasterStateParams       pointLineRasterParams;
     Pal::LineStippleStateParams           lineStippleParams;
     Pal::ViewportParams                   viewportParams;
-    // min > max means that the override is not active
-    VkDepthClampRangeEXT                  depthClampOverride;
     Pal::ScissorRectParams                scissorRectParams;
     Pal::StencilRefMaskParams             stencilRefMasks;
     SamplePattern                         samplePattern;

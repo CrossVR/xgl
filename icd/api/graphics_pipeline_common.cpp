@@ -1026,7 +1026,6 @@ static void CopyPreRasterizationShaderState(
     }
     pInfo->immedInfo.dynamicGraphicsState      = libInfo.immedInfo.dynamicGraphicsState;
     pInfo->immedInfo.viewportParams            = libInfo.immedInfo.viewportParams;
-    pInfo->immedInfo.depthClampOverride        = libInfo.immedInfo.depthClampOverride;
     pInfo->immedInfo.scissorRectParams         = libInfo.immedInfo.scissorRectParams;
     pInfo->immedInfo.rasterizerDiscardEnable   = libInfo.immedInfo.rasterizerDiscardEnable;
 
@@ -1369,15 +1368,17 @@ static void BuildViewportState(
             const auto* pClampControl = pPipelineViewportDepthClampControlCreateInfoEXT;
             if (pClampControl != nullptr)
             {
+                const auto* pClampRange = pClampControl->pDepthClampRange;
                 switch (pClampControl->depthClampMode)
                 {
                 case VK_DEPTH_CLAMP_MODE_VIEWPORT_RANGE_EXT:
                     // set min > max to disable the override
-                    pInfo->immedInfo.depthClampOverride.minDepthClamp = 1.0f;
-                    pInfo->immedInfo.depthClampOverride.maxDepthClamp = 0.0f;
+                    pInfo->immedInfo.viewportParams.depthClampOverride.minDepth = 1.0f;
+                    pInfo->immedInfo.viewportParams.depthClampOverride.maxDepth = 0.0f;
                     break;
                 case VK_DEPTH_CLAMP_MODE_USER_DEFINED_RANGE_EXT:
-                    pInfo->immedInfo.depthClampOverride = *pClampControl->pDepthClampRange;
+                    pInfo->immedInfo.viewportParams.depthClampOverride.minDepth = pClampRange->minDepthClamp;
+                    pInfo->immedInfo.viewportParams.depthClampOverride.maxDepth = pClampRange->maxDepthClamp;
                     break;
                 default:
                     VK_ASSERT(!"Unexpected depthClampMode");
@@ -1387,8 +1388,8 @@ static void BuildViewportState(
             else
             {
                 // set min > max to disable the override
-                pInfo->immedInfo.depthClampOverride.minDepthClamp = 1.0f;
-                pInfo->immedInfo.depthClampOverride.maxDepthClamp = 0.0f;
+                pInfo->immedInfo.viewportParams.depthClampOverride.minDepth = 1.0f;
+                pInfo->immedInfo.viewportParams.depthClampOverride.maxDepth = 0.0f;
             }
         }
 
